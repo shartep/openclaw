@@ -23,6 +23,9 @@ COPY --chown=node:node patches ./patches
 COPY --chown=node:node scripts ./scripts
 
 USER node
+ENV PNPM_HOME=/home/node/.local/share/pnpm
+ENV PATH="${PNPM_HOME}:${PATH}"
+RUN mkdir -p ${PNPM_HOME}
 # Reduce OOM risk on low-memory hosts during dependency installation.
 # Docker builds on small VMs may otherwise fail with "Killed" (exit 137).
 RUN NODE_OPTIONS=--max-old-space-size=2048 pnpm install --frozen-lockfile
@@ -44,12 +47,33 @@ RUN if [ -n "$OPENCLAW_INSTALL_BROWSER" ]; then \
       rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*; \
     fi
 
+# Optionally install Homebrew for skill dependency support.
+# Build with: docker build --build-arg OPENCLAW_INSTALL_HOMEBREW=1 ...
+# Allows skills to install brew packages without container rebuild.
+USER root
+ARG OPENCLAW_INSTALL_HOMEBREW=""
+RUN if [ -n "$OPENCLAW_INSTALL_HOMEBREW" ]; then \
+      apt-get update && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        procps file locales && \
+      apt-get clean && \
+      rm -rf /var/lib/apt/lists/*; \
+    fi
+
+USER node
+RUN if [ -n "$OPENCLAW_INSTALL_HOMEBREW" ]; then \
+      NONINTERACTIVE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; \
+    fi
+ENV HOMEBREW_PREFIX="/home/node/.linuxbrew"
+ENV PATH="/home/node/.linuxbrew/bin:${PATH}"
+
 USER node
 COPY --chown=node:node . .
 RUN pnpm build
 # Force pnpm for UI build (Bun may fail on ARM/Synology architectures)
 ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:build
+RUN chmod -R 755 /app/extensions
 
 # Expose the CLI binary without requiring npm global writes as non-root.
 USER root
