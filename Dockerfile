@@ -62,7 +62,7 @@ RUN if [ -n "$OPENCLAW_INSTALL_HOMEBREW" ]; then \
 
 USER node
 RUN if [ -n "$OPENCLAW_INSTALL_HOMEBREW" ]; then \
-      NONINTERACTIVE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; \
+      NONINTERACTIVE=1 HOMEBREW_PREFIX=/home/node/.linuxbrew bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; \
     fi
 ENV HOMEBREW_PREFIX="/home/node/.linuxbrew"
 ENV PATH="/home/node/.linuxbrew/bin:${PATH}"
