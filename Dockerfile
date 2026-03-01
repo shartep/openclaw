@@ -61,8 +61,13 @@ RUN if [ -n "$OPENCLAW_INSTALL_HOMEBREW" ]; then \
     fi
 
 USER node
+# Alternative install: clone brew directly to avoid root requirement.
+# See https://docs.brew.sh/Installation#alternative-installs
 RUN if [ -n "$OPENCLAW_INSTALL_HOMEBREW" ]; then \
-      NONINTERACTIVE=1 HOMEBREW_PREFIX=/home/node/.linuxbrew bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; \
+      git clone https://github.com/Homebrew/brew /home/node/.linuxbrew/Homebrew && \
+      mkdir -p /home/node/.linuxbrew/bin && \
+      ln -s /home/node/.linuxbrew/Homebrew/bin/brew /home/node/.linuxbrew/bin/brew && \
+      /home/node/.linuxbrew/bin/brew update --force --quiet; \
     fi
 ENV HOMEBREW_PREFIX="/home/node/.linuxbrew"
 ENV PATH="/home/node/.linuxbrew/bin:${PATH}"
