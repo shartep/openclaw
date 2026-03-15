@@ -62,8 +62,8 @@ jobs:
             echo "::error::Tag ${tag} is a beta release. Browser builds are for stable releases only."
             exit 1
           fi
-          if [[ ! "${tag}" =~ ^v[0-9]{4}\.[1-9][0-9]*\.[1-9][0-9]*$ ]]; then
-            echo "::error::Tag ${tag} does not match expected stable format vYYYY.M.D"
+          if [[ ! "${tag}" =~ ^v[0-9]{4}\.[1-9][0-9]*\.[1-9][0-9]*(-[0-9]+)?$ ]]; then
+            echo "::error::Tag ${tag} does not match expected stable format vYYYY.M.D or vYYYY.M.D-N"
             exit 1
           fi
           # Exit early if this version's browser image already exists in the registry.
