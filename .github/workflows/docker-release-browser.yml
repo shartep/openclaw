@@ -66,6 +66,7 @@ jobs:
             echo "::error::Tag ${tag} does not match expected stable format vYYYY.M.D or vYYYY.M.D-N"
             exit 1
           fi
+          version="${tag#v}"
           # Exit early if this version's browser image already exists in the registry.
           # On workflow_dispatch with explicit tag we always rebuild (force).
           if [[ -z "${INPUT_TAG}" ]] && \
@@ -73,7 +74,6 @@ jobs:
             echo "Image ${IMAGE}:${version}-browser already exists — nothing to build."
             exit 1
           fi
-          version="${tag#v}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
