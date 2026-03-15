@@ -1,6 +1,6 @@
 services:
   openclaw-gateway:
-    image: ghcr.io/openclaw/openclaw:latest
+    image: ghcr.io/shartep/openclaw:stable-browser
     environment:
       HOME: /home/node
       TERM: xterm-256color
@@ -50,7 +50,7 @@ services:
       start_period: 20s
 
   openclaw-cli:
-    image: ghcr.io/openclaw/openclaw:latest
+    image: ghcr.io/shartep/openclaw:stable-browser
     network_mode: "service:openclaw-gateway"
     cap_drop:
       - NET_RAW
