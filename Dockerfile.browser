@@ -9,12 +9,15 @@ ARG BASE_VERSION=latest
 FROM ghcr.io/openclaw/openclaw:${BASE_VERSION}
 
 USER root
+# Install to /opt/ms-playwright so the browser survives /home/node volume mounts.
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb && \
-    mkdir -p /home/node/.cache/ms-playwright && \
-    PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright \
+    mkdir -p /opt/ms-playwright && \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
     node /app/node_modules/playwright-core/cli.js install --with-deps chromium && \
-    chown -R node:node /home/node/.cache/ms-playwright && \
+    chown -R node:node /opt/ms-playwright && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 USER node
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
