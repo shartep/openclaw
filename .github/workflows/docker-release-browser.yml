@@ -185,3 +185,11 @@ jobs:
           echo "Published:"
           echo "  ${IMAGE}:${VERSION}-browser"
           echo "  ${IMAGE}:stable-browser"
+
+      - name: Delete old browser image versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: openclaw
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: "^(stable-browser|.*-browser-amd64|.*-browser-arm64)$"
