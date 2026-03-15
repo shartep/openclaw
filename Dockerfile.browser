@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1.7
+# Browser-enabled OpenClaw image.
+# Built on top of the official ghcr.io/openclaw/openclaw release image.
+# Adds Chromium + Xvfb via Playwright (~300 MB extra).
+#
+# Build manually:
+#   docker build --build-arg BASE_VERSION=2026.3.15 -f Dockerfile.browser -t openclaw:browser .
+ARG BASE_VERSION=latest
+FROM ghcr.io/openclaw/openclaw:${BASE_VERSION}
+
+USER root
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb && \
+    mkdir -p /home/node/.cache/ms-playwright && \
+    PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright \
+    node /app/node_modules/playwright-core/cli.js install --with-deps chromium && \
+    chown -R node:node /home/node/.cache/ms-playwright && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+USER node
