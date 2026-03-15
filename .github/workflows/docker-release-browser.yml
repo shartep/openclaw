@@ -1,0 +1,190 @@
+name: Docker Release (Browser)
+
+# Builds a browser-enabled OpenClaw image on top of the official
+# ghcr.io/openclaw/openclaw release image (adds Chromium + Xvfb via Playwright).
+#
+# Triggers:
+#   - workflow_dispatch: manual run, optionally specify a tag (e.g. v2026.3.15).
+#                        Leave tag empty to auto-detect the latest stable release.
+#   - schedule: every hour — auto-detects the latest stable release
+#               from openclaw/openclaw and builds if not yet built.
+#
+# Published images (uses github.repository so works in forks automatically):
+#   ghcr.io/<owner>/openclaw:<version>-browser
+#   ghcr.io/<owner>/openclaw:stable-browser
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build (e.g. v2026.3.15). Leave empty to auto-detect latest stable."
+        required: false
+        type: string
+  schedule:
+    - cron: "0 * * * *"
+
+concurrency:
+  group: docker-release-browser-${{ github.workflow }}-${{ inputs.tag || 'scheduled' }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Resolves which openclaw release tag to build.
+  # - workflow_dispatch with tag input: validates and uses that tag.
+  # - workflow_dispatch without tag / schedule: fetches the latest stable
+  #   release from openclaw/openclaw via GitHub API.
+  resolve-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve release tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_TAG}" ]]; then
+            tag="${INPUT_TAG}"
+            echo "Using manually provided tag: ${tag}"
+          else
+            tag="$(gh api repos/openclaw/openclaw/releases/latest --jq '.tag_name')"
+            echo "Auto-detected latest tag: ${tag}"
+          fi
+          if [[ "$tag" == *-beta* ]]; then
+            echo "::error::Tag ${tag} is a beta release. Browser builds are for stable releases only."
+            exit 1
+          fi
+          if [[ ! "${tag}" =~ ^v[0-9]{4}\.[1-9][0-9]*\.[1-9][0-9]*$ ]]; then
+            echo "::error::Tag ${tag} does not match expected stable format vYYYY.M.D"
+            exit 1
+          fi
+          # Exit early if this version's browser image already exists in the registry.
+          # On workflow_dispatch with explicit tag we always rebuild (force).
+          if [[ -z "${INPUT_TAG}" ]] && \
+             docker buildx imagetools inspect "${IMAGE}:${version}-browser" > /dev/null 2>&1; then
+            echo "Image ${IMAGE}:${version}-browser already exists — nothing to build."
+            exit 1
+          fi
+          version="${tag#v}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  # KEEP THIS WORKFLOW ON GITHUB-HOSTED RUNNERS.
+  build-amd64:
+    needs: [resolve-version]
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+      contents: read
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Builder
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push amd64 browser image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.browser
+          platforms: linux/amd64
+          build-args: |
+            BASE_VERSION=${{ needs.resolve-version.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve-version.outputs.version }}-browser-amd64
+          labels: |
+            org.opencontainers.image.version=${{ needs.resolve-version.outputs.version }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          provenance: false
+          push: true
+
+  build-arm64:
+    needs: [resolve-version]
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      packages: write
+      contents: read
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Builder
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push arm64 browser image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.browser
+          platforms: linux/arm64
+          build-args: |
+            BASE_VERSION=${{ needs.resolve-version.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve-version.outputs.version }}-browser-arm64
+          labels: |
+            org.opencontainers.image.version=${{ needs.resolve-version.outputs.version }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          provenance: false
+          push: true
+
+  create-manifest:
+    needs: [resolve-version, build-amd64, build-arm64]
+    if: ${{ needs.build-amd64.result == 'success' && needs.build-arm64.result == 'success' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push browser manifest
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            -t "${IMAGE}:${VERSION}-browser" \
+            -t "${IMAGE}:stable-browser" \
+            ${{ needs.build-amd64.outputs.digest }} \
+            ${{ needs.build-arm64.outputs.digest }}
+          echo "Published:"
+          echo "  ${IMAGE}:${VERSION}-browser"
+          echo "  ${IMAGE}:stable-browser"
