@@ -49,6 +49,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           INPUT_TAG: ${{ inputs.tag }}
           IMAGE: ghcr.io/${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           if [[ -n "${INPUT_TAG}" ]]; then
@@ -69,7 +70,7 @@ jobs:
           version="${tag#v}"
           # Exit early if this version's browser image already exists in the registry.
           # On workflow_dispatch with explicit tag we always rebuild (force).
-          if [[ -z "${INPUT_TAG}" ]] && \
+          if [[ "${EVENT_NAME}" != "workflow_dispatch" ]] && \
              docker buildx imagetools inspect "${IMAGE}:${version}-browser" > /dev/null 2>&1; then
             echo "Image ${IMAGE}:${version}-browser already exists — nothing to build."
             exit 1
@@ -84,8 +85,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -124,8 +123,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -183,8 +180,8 @@ jobs:
           docker buildx imagetools create \
             -t "${IMAGE}:${VERSION}-browser" \
             -t "${IMAGE}:stable-browser" \
-            ${{ needs.build-amd64.outputs.digest }} \
-            ${{ needs.build-arm64.outputs.digest }}
+            "${IMAGE}:${VERSION}-browser-amd64" \
+            "${IMAGE}:${VERSION}-browser-arm64"
           echo "Published:"
           echo "  ${IMAGE}:${VERSION}-browser"
           echo "  ${IMAGE}:stable-browser"
