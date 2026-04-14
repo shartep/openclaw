@@ -25,7 +25,7 @@ RUN set -e; \
  echo $latest_dir; \
  test -n "$latest_dir"; \
  test -x "$latest_dir/chrome-linux64/chrome"; \
- ln -sfn "$latest_dir" /opt/ms-playwright/chromium-current; \
+ ln -sfn "$latest_dir" /opt/ms-playwright/chromium-current;
 USER node
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
