@@ -4,17 +4,22 @@
 # Adds Chromium + Xvfb via Playwright (~300 MB extra).
 #
 # Build manually:
-#   docker build --build-arg BASE_VERSION=2026.3.15 -f Dockerfile.browser -t openclaw:browser .
+# docker build --build-arg BASE_VERSION=2026.3.15 -f Dockerfile.browser -t openclaw:browser .
 ARG BASE_VERSION=latest
 FROM ghcr.io/openclaw/openclaw:${BASE_VERSION}
 
 USER root
 # Install to /opt/ms-playwright so the browser survives /home/node volume mounts.
+# Also create a stable alias path so OpenClaw config does not depend on a versioned chromium-* folder name.
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb && \
     mkdir -p /opt/ms-playwright && \
     PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
     node /app/node_modules/playwright-core/cli.js install --with-deps chromium && \
+    latest_dir="$(find /opt/ms-playwright -maxdepth 1 -mindepth 1 -type d -name 'chromium-*' | sort -V | tail -n 1)" && \
+    test -n "$latest_dir" && \
+    test -x "$latest_dir/chrome-linux64/chrome" && \
+    ln -sfn "$latest_dir" /opt/ms-playwright/chromium-current && \
     chown -R node:node /opt/ms-playwright && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
