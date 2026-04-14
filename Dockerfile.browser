@@ -21,11 +21,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 RUN find /opt/ms-playwright -maxdepth 1 -mindepth 1 -type d -name 'chromium-*' | sort -V
 RUN find /opt/ms-playwright -maxdepth 1 -mindepth 1 -type d -name 'chromium-*' | sort -V | tail -n 1
-RUN latest_dir="$(find /opt/ms-playwright -maxdepth 1 -mindepth 1 -type d -name 'chromium-*' | sort -V | tail -n 1)" 
-RUN echo $latest_dir
-RUN test -n "$latest_dir"
-RUN test -x "$latest_dir/chrome-linux64/chrome"
-RUN ln -sfn "$latest_dir" /opt/ms-playwright/chromium-current && \
+RUN latest_dir="$(find /opt/ms-playwright -maxdepth 1 -mindepth 1 -type d -name 'chromium-*' | sort -V | tail -n 1)" && \ 
+    echo $latest_dir && \
+    test -n "$latest_dir" && \
+    test -x "$latest_dir/chrome-linux64/chrome" && \
+    ln -sfn "$latest_dir" /opt/ms-playwright/chromium-current
 USER node
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
