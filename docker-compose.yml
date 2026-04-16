@@ -1,6 +1,6 @@
 services:
   openclaw-gateway:
-    image: ghcr.io/shartep/openclaw:stable-browser
+    image: ${OPENCLAW_IMAGE}
     environment:
       HOME: /home/node
       TERM: xterm-256color
@@ -10,8 +10,9 @@ services:
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
       TZ: ${OPENCLAW_TZ:-UTC}
+      OP_SERVICE_ACCOUNT_TOKEN: ${OP_SERVICE_ACCOUNT_TOKEN}
     volumes:
-      - openclaw_home:/home/node
+      - ${OPENCLAW_HOME_VOLUME}:/home/node
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
       ## Uncomment the lines below to enable sandbox isolation
@@ -22,6 +23,8 @@ services:
       # - /var/run/docker.sock:/var/run/docker.sock
     # group_add:
     #   - "${DOCKER_GID:-999}"
+    tmpfs:
+      - /tmp
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
@@ -51,7 +54,7 @@ services:
       start_period: 20s
 
   openclaw-cli:
-    image: ghcr.io/shartep/openclaw:stable-browser
+    image: ${OPENCLAW_IMAGE}
     network_mode: "service:openclaw-gateway"
     cap_drop:
       - NET_RAW
@@ -69,7 +72,7 @@ services:
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
       TZ: ${OPENCLAW_TZ:-UTC}
     volumes:
-      - openclaw_home:/home/node
+      - ${OPENCLAW_HOME_VOLUME}:/home/node
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
     stdin_open: true
